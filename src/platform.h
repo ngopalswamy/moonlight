@@ -40,7 +40,7 @@ extern DECODER_RENDERER_CALLBACKS decoder_callbacks_sdl;
 void sdl_loop();
 #endif
 #ifdef HAVE_GSTREAMER
-bool video_gstreamer_init();
+bool gstreamer_init();
 extern DECODER_RENDERER_CALLBACKS decoder_callbacks_gstreamer;
 #endif
 

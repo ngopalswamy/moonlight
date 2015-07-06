@@ -20,61 +20,63 @@
 #include "limelight-common/Limelight.h"
 
 #include <stdbool.h>
+#include <string.h>
 
 #include <gst/gst.h>
-#include <string.h>
 #include <gst/gstmemory.h>
 
 typedef struct _CustomData {
     GstElement *pipeline;
     GstElement *source;
-    GstElement *convert;
+    GstElement *parser;
+    GstElement *decoder;
     GstElement *sink;
-    guint64 frames_added;
-    int framerate;
 } CustomData;
 
 static CustomData data;
 
-bool video_gstreamer_init() {
-    /* Create the shared data */
-    memset(&data, 0, sizeof(data));
+bool gstreamer_init() {
 
     /* Initialize GStreamer */
     gst_init(0, NULL);
 
-    /* Create the pipeline elements */
+    /* Create the elements */
     data.source = gst_element_factory_make("appsrc", "video_source");
-    data.convert = gst_element_factory_make("ffmpegcolorspace", "video_csp");
-    data.sink = gst_element_factory_make("autovideosink", "video_sink");
+    data.parser = gst_element_factory_make("h264parse", "video_parser");
+    data.decoder = gst_element_factory_make("avdec_h264", "video_decoder"); //TODO: How to select decoder dynamically?!
+    data.sink = gst_element_factory_make("glimagesink", "video_sink");
 
     /* Create the pipeline */
     data.pipeline = gst_pipeline_new("moonlight-embedded");
 
-    /* check that all elements have been created */
-    if(!data.pipeline || !data.source || !data.convert || !data.sink) {
-        g_printerr("Error creating gstreamer elements.\n");
+    if(!data.source || !data.parser || !data.decoder || !data.sink || !data.pipeline) {
+        g_printerr("Error creating Gstreamer elements");
         return FALSE;
     }
-    return TRUE;
+    gst_bin_add_many(GST_BIN(data.pipeline), data.source, data.parser, data.decoder, data.sink, NULL);
+    /* Link all elements except for the source*/
+    if(!gst_element_link_many(data.parser, data.decoder, data.sink, NULL)) {
+        g_printerr("Error linking GStreamer elements\n");
+        gst_object_unref(data.pipeline);
+        return FALSE;
+    }
+    return true;
 }
 
 void decoder_renderer_setup(int width, int height, int redrawRate, void* context, int drFlags) {
-    data.framerate = redrawRate;
     /* Configure the appsrc */
-    GstCaps *video_caps = gst_caps_new_simple("video/x-raw",
-                            "format", G_TYPE_STRING, "h264",
-                            "widht", G_TYPE_INT, width,
-                            "height", G_TYPE_INT, height,
-                            "framerate", GST_TYPE_FRACTION, redrawRate, 1,
-                            NULL);
+    GstCaps *video_caps = gst_caps_new_simple("video/x-h264",
+                                              "stream-format", G_TYPE_STRING, "(string)byte-stream",
+                                              "widht", G_TYPE_INT, width,
+                                              "height", G_TYPE_INT, height,
+                                              "framerate", GST_TYPE_FRACTION, redrawRate, 1,
+                                              NULL);
     g_object_set(data.source, "caps", video_caps, NULL);
     gst_caps_unref(video_caps);
 
-    /* Link all elements */
-    gst_bin_add_many(GST_BIN(data.pipeline), data.source, data.convert, data.sink, NULL);
-    if(!gst_element_link_many(data.source, data.convert, data.sink)) {
-        g_printerr("Error linking GStreamer elements\n");
+    /* Link the source*/
+    if(!gst_element_link(data.source, data.parser)) {
+        g_printerr("Error linking GStreamer source\n");
         gst_object_unref(data.pipeline);
         return;
     }
@@ -86,40 +88,31 @@ void decoder_renderer_setup(int width, int height, int redrawRate, void* context
 void decoder_renderer_cleanup() {
     gst_element_set_state(data.pipeline, GST_STATE_NULL);
     gst_object_unref(data.pipeline);
-    gst_object_unref(data.source);
-    gst_object_unref(data.convert);
-    gst_object_unref(data.sink);
 }
 
 int decoder_renderer_submit_decode_unit(PDECODE_UNIT decodeUnit) {
     GstBuffer *buffer;
-    GstFlowReturn ret;
+    GstFlowReturn flowReturn;
     GstMapInfo info;
+    gsize buffer_idx = 0;
 
-    PLENTRY entry = decodeUnit->bufferList;
     /* Create an empty buffer */
-    buffer = gst_buffer_new_and_alloc(entry->length);
-
+    buffer = gst_buffer_new_and_alloc((gsize) decodeUnit->fullLength);
+    buffer = gst_buffer_make_writable(buffer);
+    PLENTRY entry = decodeUnit->bufferList;
     while (entry != NULL) {
-        GST_BUFFER_TIMESTAMP(buffer) = gst_util_uint64_scale(data.frames_added, GST_SECOND, data.framerate);
-        GST_BUFFER_DURATION(buffer) = gst_util_uint64_scale(entry->length, GST_SECOND, data.framerate);
-        gst_buffer_map(buffer, &info, GST_MAP_WRITE);
-        for(int i=0; i < entry->length; i++) {
-            info.data[i] = entry->data[i];
-        }
-        gst_buffer_unmap(buffer, &info);
-        g_signal_emit_by_name(data.source, "push-buffer", buffer, &ret);
-        if(ret != GST_FLOW_OK) {
-            goto exit;
-        }
-        data.frames_added += entry->length;
+        gst_buffer_fill(buffer, buffer_idx, entry->data, (gsize)entry->length);
+        buffer_idx += entry->length;
         entry = entry->next;
+    }
+    g_signal_emit_by_name(data.source, "push-buffer", buffer, &flowReturn);
+    gst_buffer_unmap(buffer, &info);
+    if (flowReturn != GST_FLOW_OK) {
+        gst_buffer_unref(buffer);
+        return flowReturn;
     }
     gst_buffer_unref(buffer);
     return DR_OK;
-    exit:
-        gst_buffer_unref(buffer);
-        return -1;
 }
 
 DECODER_RENDERER_CALLBACKS decoder_callbacks_gstreamer = {
