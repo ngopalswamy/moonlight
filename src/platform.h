@@ -22,10 +22,11 @@
 #include <dlfcn.h>
 #include <stdlib.h>
 #include <stdio.h>
+#include <stdbool.h>
 
 #define IS_EMBEDDED(SYSTEM) SYSTEM != SDL
 
-enum platform { NONE, SDL, PI, IMX, FAKE };
+enum platform { NONE, SDL, PI, IMX, GSTREAMER, FAKE };
 
 enum platform platform_check(char*);
 PDECODER_RENDERER_CALLBACKS platform_get_video(enum platform system);
@@ -38,3 +39,8 @@ extern DECODER_RENDERER_CALLBACKS decoder_callbacks_fake;
 extern DECODER_RENDERER_CALLBACKS decoder_callbacks_sdl;
 void sdl_loop();
 #endif
+#ifdef HAVE_GSTREAMER
+bool video_gstreamer_init();
+extern DECODER_RENDERER_CALLBACKS decoder_callbacks_gstreamer;
+#endif
+

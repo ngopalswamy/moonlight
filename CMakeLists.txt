@@ -1,5 +1,6 @@
 project(moonlight-embedded C)
 cmake_minimum_required(VERSION 3.1)
+
 SET(CMAKE_MODULE_PATH "${PROJECT_SOURCE_DIR}/cmake")
 include(${CMAKE_ROOT}/Modules/GNUInstallDirs.cmake)
 
@@ -18,6 +19,7 @@ find_package(Opus REQUIRED)
 find_package(Broadcom)
 find_package(Freescale)
 find_package(CEC 3.0)
+find_package(GStreamer)
 
 find_package(PkgConfig REQUIRED)
 pkg_check_modules(EVDEV REQUIRED libevdev)
@@ -39,13 +41,18 @@ SET(GAMESTREAM_INCLUDE_DIR ./libgamestream)
 if(CMAKE_BUILD_TYPE MATCHES Debug)
   list(APPEND SRC_LIST ./src/video/fake.c)
   list(APPEND MOONLIGHT_DEFINITIONS HAVE_FAKE LC_DEBUG)
-elseif(NOT BROADCOM_FOUND AND NOT FREESCALE_FOUND AND NOT SOFTWARE_FOUND)
+elseif(NOT BROADCOM_FOUND AND NOT FREESCALE_FOUND AND NOT SOFTWARE_FOUND AND NOT GSTREAMER_FOUND)
   message(FATAL_ERROR "No video output available")
 endif()
 
 if (SOFTWARE_FOUND)
   list(APPEND SRC_LIST ./src/video/ffmpeg.c ./src/video/sdl.c ./src/audio/sdl.c)
   list(APPEND MOONLIGHT_DEFINITIONS HAVE_SDL)
+endif()
+
+if(GSTREAMER_FOUND)
+  list(APPEND SRC_LIST ./src/video/gstreamer.c)
+  list(APPEND MOONLIGHT_DEFINITIONS HAVE_GSTREAMER)
 endif()
 
 if (BROADCOM_FOUND OR FREESCALE_FOUND OR CMAKE_BUILD_TYPE MATCHES Debug)
@@ -87,6 +94,11 @@ endif()
 if (SOFTWARE_FOUND)
   target_include_directories(moonlight PRIVATE ${SDL_INCLUDE_DIRS} ${AVCODEC_INCLUDE_DIRS} ${AVUTIL_INCLUDE_DIRS} ${SWSCALE_INCLUDE_DIRS})
   target_link_libraries(moonlight ${SDL_LIBRARIES} ${AVCODEC_LIBRARIES} ${AVUTIL_LIBRARIES} ${SWSCALE_LIBRARIES})
+endif()
+
+if(GSTREAMER_FOUND)
+  target_include_directories(moonlight PRIVATE ${GSTREAMER_INCLUDE_DIRS})
+  target_link_libraries(moonlight ${GSTREAMER_LIBRARIES})
 endif()
 
 set_property(TARGET moonlight PROPERTY COMPILE_DEFINITIONS ${MOONLIGHT_DEFINITIONS})
