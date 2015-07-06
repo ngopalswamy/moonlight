@@ -22,17 +22,24 @@
 #include <stdbool.h>
 
 #include <gst/gst.h>
+#include <string.h>
+#include <gst/gstmemory.h>
 
 typedef struct _CustomData {
     GstElement *pipeline;
     GstElement *source;
     GstElement *convert;
     GstElement *sink;
+    guint64 frames_added;
+    int framerate;
 } CustomData;
 
 static CustomData data;
 
 bool video_gstreamer_init() {
+    /* Create the shared data */
+    memset(&data, 0, sizeof(data));
+
     /* Initialize GStreamer */
     gst_init(0, NULL);
 
@@ -53,6 +60,7 @@ bool video_gstreamer_init() {
 }
 
 void decoder_renderer_setup(int width, int height, int redrawRate, void* context, int drFlags) {
+    data.framerate = redrawRate;
     /* Configure the appsrc */
     GstCaps *video_caps = gst_caps_new_simple("video/x-raw",
                             "format", G_TYPE_STRING, "h264",
@@ -84,11 +92,34 @@ void decoder_renderer_cleanup() {
 }
 
 int decoder_renderer_submit_decode_unit(PDECODE_UNIT decodeUnit) {
+    GstBuffer *buffer;
+    GstFlowReturn ret;
+    GstMapInfo info;
+
     PLENTRY entry = decodeUnit->bufferList;
+    /* Create an empty buffer */
+    buffer = gst_buffer_new_and_alloc(entry->length);
+
     while (entry != NULL) {
+        GST_BUFFER_TIMESTAMP(buffer) = gst_util_uint64_scale(data.frames_added, GST_SECOND, data.framerate);
+        GST_BUFFER_DURATION(buffer) = gst_util_uint64_scale(entry->length, GST_SECOND, data.framerate);
+        gst_buffer_map(buffer, &info, GST_MAP_WRITE);
+        for(int i=0; i < entry->length; i++) {
+            info.data[i] = entry->data[i];
+        }
+        gst_buffer_unmap(buffer, &info);
+        g_signal_emit_by_name(data.source, "push-buffer", buffer, &ret);
+        if(ret != GST_FLOW_OK) {
+            goto exit;
+        }
+        data.frames_added += entry->length;
         entry = entry->next;
     }
+    gst_buffer_unref(buffer);
     return DR_OK;
+    exit:
+        gst_buffer_unref(buffer);
+        return -1;
 }
 
 DECODER_RENDERER_CALLBACKS decoder_callbacks_gstreamer = {
