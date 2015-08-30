@@ -52,9 +52,9 @@ enum platform platform_check(char* name) {
       return PI;
   }
   #endif
-  if(std || strcmp(name, "gstreamer") == 0) {
+  if(std || strcmp(name, "gst") == 0) {
     if (gstreamer_init())
-      return GSTREAMER;
+      return GST;
   }
   #ifdef HAVE_FAKE
   if (std || strcmp(name, "fake") == 0)
@@ -77,9 +77,9 @@ DECODER_RENDERER_CALLBACKS* platform_get_video(enum platform system) {
   case PI:
     return (PDECODER_RENDERER_CALLBACKS) dlsym(RTLD_DEFAULT, "decoder_callbacks_pi");
   #endif
-  #ifdef HAVE_GSTREAMER
-  case GSTREAMER:
-    return &decoder_callbacks_gstreamer;
+  #ifdef HAVE_GST
+  case GST:
+    return &decoder_callbacks_gst;
   #endif
   #ifdef HAVE_FAKE
   case FAKE:

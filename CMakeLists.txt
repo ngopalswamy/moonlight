@@ -51,8 +51,8 @@ if (SOFTWARE_FOUND)
 endif()
 
 if(GSTREAMER_FOUND)
-  list(APPEND SRC_LIST ./src/video/gstreamer.c)
-  list(APPEND MOONLIGHT_DEFINITIONS HAVE_GSTREAMER)
+  list(APPEND SRC_LIST  ./src/video/gstreamer.c ./src/video/gst.c)
+  list(APPEND MOONLIGHT_DEFINITIONS HAVE_GST)
 endif()
 
 if (BROADCOM_FOUND OR FREESCALE_FOUND OR CMAKE_BUILD_TYPE MATCHES Debug)

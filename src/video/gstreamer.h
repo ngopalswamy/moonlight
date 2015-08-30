@@ -17,30 +17,8 @@
  * along with Moonlight; if not, see <http://www.gnu.org/licenses/>.
  */
 
-#include "limelight-common/Limelight.h"
-
-#include <dlfcn.h>
-#include <stdlib.h>
-#include <stdio.h>
 #include <stdbool.h>
 
-#define IS_EMBEDDED(SYSTEM) SYSTEM != SDL
-
-enum platform { NONE, SDL, PI, IMX, GST, FAKE };
-
-enum platform platform_check(char*);
-PDECODER_RENDERER_CALLBACKS platform_get_video(enum platform system);
-PAUDIO_RENDERER_CALLBACKS platform_get_audio(enum platform system);
-
-#ifdef HAVE_FAKE
-extern DECODER_RENDERER_CALLBACKS decoder_callbacks_fake;
-#endif
-#ifdef HAVE_SDL
-extern DECODER_RENDERER_CALLBACKS decoder_callbacks_sdl;
-void sdl_loop();
-#endif
-#ifdef HAVE_GST
-bool gstreamer_init();
-extern DECODER_RENDERER_CALLBACKS decoder_callbacks_gst;
-#endif
-
+void gstreamer_setup(int width, int height, int redrawRate);
+int gstreamer_decode(unsigned char* indata, int inlen);
+void gstreamer_destroy();
