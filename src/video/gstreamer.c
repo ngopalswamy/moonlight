@@ -90,7 +90,7 @@ bool gstreamer_init() {
     return true;
 }
 
-void decoder_renderer_setup(int width, int height, int redrawRate, void* context, int drFlags) {
+static void decoder_renderer_setup(int width, int height, int redrawRate, void* context, int drFlags) {
     /* Configure the appsrc */
     GstCaps *video_caps = gst_caps_new_simple("video/x-h264",
                                               "stream-format", G_TYPE_STRING, "byte-stream",
@@ -105,12 +105,12 @@ void decoder_renderer_setup(int width, int height, int redrawRate, void* context
     gst_element_set_state(data.pipeline, GST_STATE_PLAYING);
 }
 
-void decoder_renderer_cleanup() {
+static void decoder_renderer_cleanup() {
     gst_element_set_state(data.pipeline, GST_STATE_NULL);
     gst_object_unref(data.pipeline);
 }
 
-int decoder_renderer_submit_decode_unit(PDECODE_UNIT decodeUnit) {
+static int decoder_renderer_submit_decode_unit(PDECODE_UNIT decodeUnit) {
     GstBuffer *buffer;
     GstFlowReturn flowReturn;
     GstMapInfo info;
