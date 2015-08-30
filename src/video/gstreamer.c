@@ -126,12 +126,11 @@ int decoder_renderer_submit_decode_unit(PDECODE_UNIT decodeUnit) {
         entry = entry->next;
     }
     g_signal_emit_by_name(data.source, "push-buffer", buffer, &flowReturn);
-    gst_buffer_unmap(buffer, &info);
+    gst_buffer_unref(buffer);
     if (flowReturn != GST_FLOW_OK) {
-        gst_buffer_unref(buffer);
+        //TODO solve problems
         return flowReturn;
     }
-    gst_buffer_unref(buffer);
     return DR_OK;
 }
 
