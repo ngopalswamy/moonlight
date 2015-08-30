@@ -19,6 +19,10 @@
 
 #include <stdbool.h>
 
+#include <gst/gst.h>
+
 void gstreamer_setup(int width, int height, int redrawRate);
 int gstreamer_decode(unsigned char* indata, int inlen);
 void gstreamer_destroy();
+
+GstSample* gstreamer_get_frame();

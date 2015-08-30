@@ -40,7 +40,7 @@ extern DECODER_RENDERER_CALLBACKS decoder_callbacks_sdl;
 void sdl_loop();
 #endif
 #ifdef HAVE_GST
-bool gstreamer_init();
+bool gstreamer_init(bool);
 extern DECODER_RENDERER_CALLBACKS decoder_callbacks_gst;
 #endif
 

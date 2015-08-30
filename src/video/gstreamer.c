@@ -1,6 +1,7 @@
 /*
  * This file is part of Moonlight Embedded.
  *
+ * Copyright (C) 2015 Iwan Timmer
  * Copyright (C) 2015 Torben Hansing
  *
  * Moonlight is free software; you can redistribute it and/or modify
@@ -21,6 +22,7 @@
 #include <string.h>
 
 #include <gst/gst.h>
+#include <gst/app/gstappsink.h>
 #include <gst/video/gstvideodecoder.h>
 
 typedef struct _CustomData {
@@ -33,6 +35,7 @@ typedef struct _CustomData {
 } CustomData;
 
 static CustomData data;
+static int samples;
 
 static void pad_added(GstElement *src, GstPad *pad, CustomData *data) {
     GstPad *sink_pad = gst_element_get_static_pad(data->sink, "sink");
@@ -57,14 +60,25 @@ static void pad_added(GstElement *src, GstPad *pad, CustomData *data) {
     gst_object_unref (sink_pad);
 }
 
-bool gstreamer_init() {
+static GstFlowReturn new_sample_callback(GstAppSink *appsink, gpointer user_data) {
+    samples++;
+    return GST_FLOW_OK;
+}
+
+static GstAppSinkCallbacks gst_callbacks = {
+    .eos = NULL,
+    .new_preroll = NULL,
+    .new_sample = new_sample_callback,
+};
+
+bool gstreamer_init(bool native) {
     /* Initialize GStreamer */
     gst_init(0, NULL);
 
     /* Create the elements */
     data.source = gst_element_factory_make("appsrc", "video_source");
     data.decoder = gst_element_factory_make("decodebin", "video_decoder");
-    data.sink = gst_element_factory_make("autovideosink", "video_sink");
+    data.sink = gst_element_factory_make(native?"autovideosink":"appsink", "video_sink");
 
     /* Create the pipeline */
     data.pipeline = gst_pipeline_new("moonlight-embedded");
@@ -84,6 +98,9 @@ bool gstreamer_init() {
 
     /* Register callback on pad-added signal */
     g_signal_connect(data.decoder, "pad-added", G_CALLBACK(pad_added), &data);
+    
+    if (!native)
+        gst_app_sink_set_callbacks (GST_APP_SINK(data.sink), &gst_callbacks, NULL, NULL);
 
     return true;
 }
@@ -126,4 +143,12 @@ int gstreamer_decode(unsigned char* indata, int inlen) {
         return flowReturn;
     }
     return 1;
+}
+
+GstSample* gstreamer_get_frame() {
+    if (samples > 0) {
+        samples--;
+        return gst_app_sink_pull_sample(GST_APP_SINK(data.sink));
+    } else
+        return NULL;
 }

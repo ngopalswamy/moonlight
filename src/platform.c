@@ -53,7 +53,7 @@ enum platform platform_check(char* name) {
   }
   #endif
   if(std || strcmp(name, "gst") == 0) {
-    if (gstreamer_init())
+    if (gstreamer_init(true))
       return GST;
   }
   #ifdef HAVE_FAKE
